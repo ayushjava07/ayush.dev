@@ -719,675 +719,661 @@ const ContributionCalendar = ({ username }) => {
 
     // Fetch real contribution data from GitHub (via proxy to avoid CORS)
     useEffect(() => {
-        const fetchContributions = async () => {
-            try {
-                // Use Vite proxy in dev, CORS proxy in production
-                const isDev = window.location.hostname === 'localhost';
-                const url = isDev
-                    ? `/github-contributions/${username}/contributions`
-                    : `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://github.com/users/${username}/contributions`)}`;
-                const res = await fetch(url);
-                const html = await res.text();
+        useEffect(() => {
+            const fetchContributions = async () => {
+                try {
+                    // Use a stable public API for GitHub contributions instead of scraping HTML
+                    const res = await fetch(`https://github-contributions-api.jogruber.de/v4/${username}?y=last`);
+                    const data = await res.json();
 
-                // Parse total contributions from heading text
-                const totalMatch = html.match(/(\d[\d,]*)\s+contributions?\s+in\s+the\s+last\s+year/i);
-                if (totalMatch) {
-                    setTotalContributions(parseInt(totalMatch[1].replace(/,/g, ''), 10));
-                }
+                    if (!data?.contributions) return;
 
-                // Parse each contribution day: data-date + data-level
-                const dayRegex = /data-date="(\d{4}-\d{2}-\d{2})"[^>]*data-level="(\d)"/g;
-                const days = [];
-                let match;
-                while ((match = dayRegex.exec(html)) !== null) {
-                    days.push({ date: match[1], level: parseInt(match[2], 10) });
-                }
+                    // Update total contributions
+                    // The API returns total for specific years, we can sum them or just take the 'last' year if available, 
+                    // but usually looking at the length or specific year totals is better.
+                    // For "last year", let's approximate by summing the counts in the response.
+                    const total = data.contributions.reduce((acc, day) => acc + day.count, 0);
+                    setTotalContributions(total);
 
-                // Parse tooltip text to get actual counts
-                const tooltipRegex = /for="contribution-day-component-[^"]*"[^>]*>(?:No contributions|(\d+)\s+contributions?)\s+on\s+([^<.]+)/g;
-                const countMap = {};
-                let tm;
-                while ((tm = tooltipRegex.exec(html)) !== null) {
-                    const count = tm[1] ? parseInt(tm[1], 10) : 0;
-                    const dateText = tm[2].trim();
-                    countMap[dateText] = count;
-                }
+                    // Transform flat array into weeks (Sunday to Saturday)
+                    // The API returns a flat list of days. We need to group them.
+                    const weeks = [];
+                    let currentWeek = [];
 
-                // Match counts to days by formatted date
-                const daysWithCounts = days.map(d => {
-                    const dateObj = new Date(d.date + 'T00:00:00');
-                    const formatted = dateObj.toLocaleDateString('en-US', {
-                        month: 'long', day: 'numeric',
+                    // Ensure we handle the "last year" logic correctly.
+                    // The API usually returns the full calendar year or last 365 days. 
+                    // We'll iterate through the contributions.
+                    data.contributions.forEach((day, i) => {
+                        const dateObj = new Date(day.date);
+                        // Standardize level (API returns 0-4, which matches our needs)
+                        // If API returns localized levels, we might need mapping, but usually it returns 0-4.
+
+                        const dayData = {
+                            date: dateObj,
+                            level: day.level,
+                            count: day.count
+                        };
+
+                        currentWeek.push(dayData);
+
+                        // If it's Saturday (6) or last item, push the week
+                        if (dateObj.getDay() === 6 || i === data.contributions.length - 1) {
+                            // If it's the very first week and doesn't start on Sunday, we might need padding?
+                            // Actually the API usually gives full weeks or we should look at the first date.
+                            // But for simplicity, let's just push what we have.
+                            // Our render logic expects 7 days potentially. 
+                            // If currentWeek is not 7 days (e.g. at start or end), we might need to pad.
+
+                            weeks.push(currentWeek);
+                            currentWeek = [];
+                        }
                     });
-                    // GitHub uses ordinal suffix (e.g., "January 5th"), try matching
-                    const dayNum = dateObj.getDate();
-                    const suffix = dayNum === 1 || dayNum === 21 || dayNum === 31 ? 'st'
-                        : dayNum === 2 || dayNum === 22 ? 'nd'
-                            : dayNum === 3 || dayNum === 23 ? 'rd' : 'th';
-                    const monthName = dateObj.toLocaleDateString('en-US', { month: 'long' });
-                    const ordinalKey = `${monthName} ${dayNum}${suffix}`;
 
-                    const count = countMap[ordinalKey] ?? 0;
-                    return { date: dateObj, level: d.level, count };
-                });
+                    // Basic padding for visual consistency if needed (optional)
+                    // if (weeks[0].length < 7) { ... } 
 
-                // Group into weeks (7 days per column, Sunday=0 start)
-                const weeks = [];
-                let currentWeek = [];
-                daysWithCounts.forEach((day, i) => {
-                    currentWeek.push(day);
-                    if (currentWeek.length === 7) {
-                        weeks.push(currentWeek);
-                        currentWeek = [];
-                    }
-                });
-                if (currentWeek.length > 0) {
-                    // Pad remaining week with empty cells
-                    while (currentWeek.length < 7) {
-                        currentWeek.push({ date: new Date(), level: 0, count: 0 });
-                    }
-                    weeks.push(currentWeek);
+                    // Filter to last 52 weeks to show roughly one year if the API returns 365 days
+                    const last52Weeks = weeks.slice(-53); // Take last ~ year
+
+                    setContributionData(last52Weeks);
+                } catch (err) {
+                    console.error('Failed to fetch contribution data:', err);
+                } finally {
+                    setCalendarLoading(false);
                 }
+            };
+            fetchContributions();
+        }, [username]);
 
-                setContributionData(weeks);
-            } catch (err) {
-                console.error('Failed to fetch contribution data:', err);
-            } finally {
-                setCalendarLoading(false);
+        // Get month labels for top axis
+        const monthLabels = React.useMemo(() => {
+            const labels = [];
+            let lastMonth = -1;
+            contributionData.forEach((week, i) => {
+                const firstDay = week[0]?.date;
+                if (firstDay) {
+                    const month = firstDay.getMonth();
+                    if (month !== lastMonth) {
+                        labels.push({ month, weekIndex: i });
+                        lastMonth = month;
+                    }
+                }
+            });
+            return labels;
+        }, [contributionData]);
+
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        const cellColors = [
+            'bg-zinc-200/40 dark:bg-zinc-800/40 border-zinc-200/60 dark:border-zinc-800/60',
+            'bg-indigo-950/80 border-indigo-900/50',
+            'bg-indigo-800/70 border-indigo-700/50',
+            'bg-indigo-600/80 border-indigo-500/50',
+            'bg-indigo-400 border-indigo-300/50',
+        ];
+
+        const cellGlows = [
+            '',
+            '',
+            'shadow-[0_0_4px_rgba(99,102,241,0.15)]',
+            'shadow-[0_0_6px_rgba(99,102,241,0.25)]',
+            'shadow-[0_0_8px_rgba(129,140,248,0.35)]',
+        ];
+
+        const formatDate = (date) => {
+            if (!(date instanceof Date) || isNaN(date)) return '';
+            return new Intl.DateTimeFormat('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric',
+            }).format(date);
+        };
+
+        const handleMouseMove = (e) => {
+            if (calendarRef.current) {
+                const rect = calendarRef.current.getBoundingClientRect();
+                setTooltipPos({
+                    x: e.clientX - rect.left,
+                    y: e.clientY - rect.top,
+                });
             }
         };
-        fetchContributions();
-    }, [username]);
 
-    // Get month labels for top axis
-    const monthLabels = React.useMemo(() => {
-        const labels = [];
-        let lastMonth = -1;
-        contributionData.forEach((week, i) => {
-            const firstDay = week[0]?.date;
-            if (firstDay) {
-                const month = firstDay.getMonth();
-                if (month !== lastMonth) {
-                    labels.push({ month, weekIndex: i });
-                    lastMonth = month;
-                }
-            }
-        });
-        return labels;
-    }, [contributionData]);
+        const cellSize = 13;
+        const cellGap = 3;
 
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const dayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-    const cellColors = [
-        'bg-zinc-200/40 dark:bg-zinc-800/40 border-zinc-200/60 dark:border-zinc-800/60',
-        'bg-indigo-950/80 border-indigo-900/50',
-        'bg-indigo-800/70 border-indigo-700/50',
-        'bg-indigo-600/80 border-indigo-500/50',
-        'bg-indigo-400 border-indigo-300/50',
-    ];
-
-    const cellGlows = [
-        '',
-        '',
-        'shadow-[0_0_4px_rgba(99,102,241,0.15)]',
-        'shadow-[0_0_6px_rgba(99,102,241,0.25)]',
-        'shadow-[0_0_8px_rgba(129,140,248,0.35)]',
-    ];
-
-    const formatDate = (date) => {
-        if (!(date instanceof Date) || isNaN(date)) return '';
-        return new Intl.DateTimeFormat('en-US', {
-            weekday: 'short',
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        }).format(date);
-    };
-
-    const handleMouseMove = (e) => {
-        if (calendarRef.current) {
-            const rect = calendarRef.current.getBoundingClientRect();
-            setTooltipPos({
-                x: e.clientX - rect.left,
-                y: e.clientY - rect.top,
-            });
+        // Loading skeleton
+        if (calendarLoading) {
+            return (
+                <div className="w-full">
+                    <div className="flex gap-[3px] overflow-hidden">
+                        {Array.from({ length: 52 }).map((_, w) => (
+                            <div key={w} className="flex flex-col gap-[3px]">
+                                {Array.from({ length: 7 }).map((_, d) => (
+                                    <div
+                                        key={d}
+                                        className="w-[13px] h-[13px] rounded-[3px] bg-zinc-200/50 dark:bg-zinc-800/30 animate-pulse"
+                                        style={{ animationDelay: `${w * 20}ms` }}
+                                    />
+                                ))}
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-4 pt-3 border-t border-zinc-200/30 dark:border-zinc-800/30">
+                        <div className="h-3 w-48 bg-zinc-200/50 dark:bg-zinc-800/30 rounded animate-pulse" />
+                    </div>
+                </div>
+            );
         }
-    };
 
-    const cellSize = 13;
-    const cellGap = 3;
-
-    // Loading skeleton
-    if (calendarLoading) {
         return (
-            <div className="w-full">
-                <div className="flex gap-[3px] overflow-hidden">
-                    {Array.from({ length: 52 }).map((_, w) => (
-                        <div key={w} className="flex flex-col gap-[3px]">
-                            {Array.from({ length: 7 }).map((_, d) => (
-                                <div
-                                    key={d}
-                                    className="w-[13px] h-[13px] rounded-[3px] bg-zinc-200/50 dark:bg-zinc-800/30 animate-pulse"
-                                    style={{ animationDelay: `${w * 20}ms` }}
-                                />
-                            ))}
+            <div className="relative" ref={calendarRef} onMouseMove={handleMouseMove}>
+                {/* Tooltip */}
+                {hoveredCell && (
+                    <div
+                        className="absolute z-50 pointer-events-none"
+                        style={{
+                            left: tooltipPos.x,
+                            top: tooltipPos.y - 48,
+                            transform: 'translateX(-50%)',
+                        }}
+                    >
+                        <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 shadow-xl shadow-black/10 dark:shadow-black/40 text-center whitespace-nowrap">
+                            <p className="text-xs font-semibold text-zinc-900 dark:text-white">
+                                {hoveredCell.count} contribution{hoveredCell.count !== 1 ? 's' : ''}
+                            </p>
+                            <p className="text-[10px] text-zinc-400 mt-0.5">
+                                {formatDate(hoveredCell.date)}
+                            </p>
+                            <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-white dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700 rotate-45" />
                         </div>
-                    ))}
-                </div>
-                <div className="mt-4 pt-3 border-t border-zinc-200/30 dark:border-zinc-800/30">
-                    <div className="h-3 w-48 bg-zinc-200/50 dark:bg-zinc-800/30 rounded animate-pulse" />
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="relative" ref={calendarRef} onMouseMove={handleMouseMove}>
-            {/* Tooltip */}
-            {hoveredCell && (
-                <div
-                    className="absolute z-50 pointer-events-none"
-                    style={{
-                        left: tooltipPos.x,
-                        top: tooltipPos.y - 48,
-                        transform: 'translateX(-50%)',
-                    }}
-                >
-                    <div className="bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 shadow-xl shadow-black/10 dark:shadow-black/40 text-center whitespace-nowrap">
-                        <p className="text-xs font-semibold text-zinc-900 dark:text-white">
-                            {hoveredCell.count} contribution{hoveredCell.count !== 1 ? 's' : ''}
-                        </p>
-                        <p className="text-[10px] text-zinc-400 mt-0.5">
-                            {formatDate(hoveredCell.date)}
-                        </p>
-                        <div className="absolute left-1/2 -bottom-1 -translate-x-1/2 w-2 h-2 bg-white dark:bg-zinc-800 border-b border-r border-zinc-200 dark:border-zinc-700 rotate-45" />
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Scrollable calendar area */}
-            <div className="w-full overflow-x-auto pb-2">
-                <div className="inline-block min-w-[740px]">
-                    {/* Month labels */}
-                    <div className="flex ml-[32px] mb-2" style={{ gap: `${cellGap}px` }}>
-                        {contributionData.map((_, weekIdx) => {
-                            const label = monthLabels.find(l => l.weekIndex === weekIdx);
-                            return (
-                                <div
-                                    key={weekIdx}
-                                    style={{ width: `${cellSize}px`, minWidth: `${cellSize}px` }}
-                                    className="text-center"
-                                >
-                                    {label && (
-                                        <span className="text-[10px] text-zinc-500 font-mono">
-                                            {monthNames[label.month]}
-                                        </span>
-                                    )}
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    <div className="flex">
-                        {/* Day labels */}
-                        <div
-                            className="flex flex-col mr-1.5 pt-0"
-                            style={{ gap: `${cellGap}px` }}
-                        >
-                            {dayLabels.map((day, i) => (
-                                <div
-                                    key={day}
-                                    style={{ height: `${cellSize}px` }}
-                                    className="flex items-center justify-end pr-1"
-                                >
-                                    {i % 2 === 1 && (
-                                        <span className="text-[9px] text-zinc-600 font-mono leading-none">
-                                            {day}
-                                        </span>
-                                    )}
-                                </div>
-                            ))}
+                {/* Scrollable calendar area */}
+                <div className="w-full overflow-x-auto pb-2">
+                    <div className="inline-block min-w-[740px]">
+                        {/* Month labels */}
+                        <div className="flex ml-[32px] mb-2" style={{ gap: `${cellGap}px` }}>
+                            {contributionData.map((_, weekIdx) => {
+                                const label = monthLabels.find(l => l.weekIndex === weekIdx);
+                                return (
+                                    <div
+                                        key={weekIdx}
+                                        style={{ width: `${cellSize}px`, minWidth: `${cellSize}px` }}
+                                        className="text-center"
+                                    >
+                                        {label && (
+                                            <span className="text-[10px] text-zinc-500 font-mono">
+                                                {monthNames[label.month]}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
 
-                        {/* Weeks grid */}
-                        <div className="flex" style={{ gap: `${cellGap}px` }}>
-                            {contributionData.map((week, weekIdx) => (
-                                <div key={weekIdx} className="flex flex-col" style={{ gap: `${cellGap}px` }}>
-                                    {week.map((day, dayIdx) => (
-                                        <motion.div
-                                            key={dayIdx}
-                                            initial={{ opacity: 0, scale: 0.3 }}
-                                            whileInView={{ opacity: 1, scale: 1 }}
-                                            viewport={{ once: true, margin: '-20px' }}
-                                            transition={{
-                                                delay: weekIdx * 0.006 + dayIdx * 0.008,
-                                                duration: 0.25,
-                                                ease: 'easeOut',
-                                            }}
-                                            style={{
-                                                width: `${cellSize}px`,
-                                                height: `${cellSize}px`,
-                                            }}
-                                            className={`
+                        <div className="flex">
+                            {/* Day labels */}
+                            <div
+                                className="flex flex-col mr-1.5 pt-0"
+                                style={{ gap: `${cellGap}px` }}
+                            >
+                                {dayLabels.map((day, i) => (
+                                    <div
+                                        key={day}
+                                        style={{ height: `${cellSize}px` }}
+                                        className="flex items-center justify-end pr-1"
+                                    >
+                                        {i % 2 === 1 && (
+                                            <span className="text-[9px] text-zinc-600 font-mono leading-none">
+                                                {day}
+                                            </span>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Weeks grid */}
+                            <div className="flex" style={{ gap: `${cellGap}px` }}>
+                                {contributionData.map((week, weekIdx) => (
+                                    <div key={weekIdx} className="flex flex-col" style={{ gap: `${cellGap}px` }}>
+                                        {week.map((day, dayIdx) => (
+                                            <motion.div
+                                                key={dayIdx}
+                                                initial={{ opacity: 0, scale: 0.3 }}
+                                                whileInView={{ opacity: 1, scale: 1 }}
+                                                viewport={{ once: true, margin: '-20px' }}
+                                                transition={{
+                                                    delay: weekIdx * 0.006 + dayIdx * 0.008,
+                                                    duration: 0.25,
+                                                    ease: 'easeOut',
+                                                }}
+                                                style={{
+                                                    width: `${cellSize}px`,
+                                                    height: `${cellSize}px`,
+                                                }}
+                                                className={`
                                                 rounded-[3px] border cursor-pointer
                                                 transition-all duration-200
                                                 hover:scale-[1.6] hover:z-10 hover:border-indigo-400/60
                                                 ${cellColors[day.level] || cellColors[0]}
                                                 ${cellGlows[day.level] || ''}
                                             `}
-                                            onMouseEnter={() => setHoveredCell(day)}
-                                            onMouseLeave={() => setHoveredCell(null)}
-                                        />
+                                                onMouseEnter={() => setHoveredCell(day)}
+                                                onMouseLeave={() => setHoveredCell(null)}
+                                            />
+                                        ))}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Footer: Legend + Total */}
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-200/30 dark:border-zinc-800/30">
+                    <div className="flex items-center gap-4">
+                        <p className="text-xs text-zinc-600 font-mono">
+                            {totalContributions.toLocaleString()} contributions in the last year
+                        </p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-zinc-600 font-mono mr-1">Less</span>
+                        {cellColors.map((c, i) => (
+                            <div
+                                key={i}
+                                className={`w-[11px] h-[11px] rounded-[3px] border ${c} ${cellGlows[i]}`}
+                            />
+                        ))}
+                        <span className="text-[10px] text-zinc-600 font-mono ml-1">More</span>
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const GitHubSection = () => {
+        const { profile, events, repos, loading } = useGitHubData();
+
+        // Deduplicate events for display (max 8)
+        const recentEvents = events.slice(0, 8);
+
+        return (
+            <Section id="github" className="py-12 md:py-16">
+                <div className="max-w-6xl mx-auto px-6">
+                    <motion.div variants={fadeUp} className="mb-8">
+                        <span className="inline-flex items-center gap-2 text-sm font-mono text-indigo-400 mb-3">
+                            <GitBranch size={14} />
+                            OPEN SOURCE
+                        </span>
+                        <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
+                            GitHub <span className="text-gradient">Activity</span>
+                        </h2>
+                    </motion.div>
+
+                    {/* Stats Row — real data */}
+                    <motion.div
+                        variants={fadeUp}
+                        className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
+                    >
+                        {[
+                            { icon: <Code2 size={16} />, label: 'Public Repos', value: loading ? '—' : profile?.public_repos },
+                            { icon: <Star size={16} />, label: 'Followers', value: loading ? '—' : profile?.followers },
+                            { icon: <GitBranch size={16} />, label: 'Following', value: loading ? '—' : profile?.following },
+                            { icon: <GitCommit size={16} />, label: 'Recent Events', value: loading ? '—' : events.length + '+' },
+                        ].map((stat) => (
+                            <div
+                                key={stat.label}
+                                className="flex items-center gap-3 p-4 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors"
+                            >
+                                <div className="p-2 rounded-lg bg-zinc-100/50 dark:bg-zinc-800/50 text-indigo-400">
+                                    {stat.icon}
+                                </div>
+                                <div>
+                                    <p className="text-xl font-bold text-zinc-900 dark:text-white">{stat.value}</p>
+                                    <p className="text-xs text-zinc-500">{stat.label}</p>
+                                </div>
+                            </div>
+                        ))}
+                    </motion.div>
+
+                    {/* Contribution Graph — Custom Interactive Calendar */}
+                    <motion.div
+                        variants={fadeUp}
+                        className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6 mb-6 overflow-hidden"
+                    >
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                                <GitCommit size={14} className="text-indigo-400" />
+                                Contribution Graph
+                            </h3>
+                            <a
+                                href={`https://github.com/${GITHUB_USERNAME}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-mono"
+                            >
+                                <Github size={12} />
+                                @{GITHUB_USERNAME}
+                                <ArrowUpRight size={10} />
+                            </a>
+                        </div>
+                        <ContributionCalendar username={GITHUB_USERNAME} />
+                    </motion.div>
+
+                    {/* Two-column: Recent Activity + Recent Repos */}
+                    <div className="grid md:grid-cols-2 gap-6 md:gap-4">
+                        {/* Recent Activity */}
+                        <motion.div
+                            variants={fadeUp}
+                            className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6"
+                        >
+                            <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <Terminal size={14} className="text-indigo-400" />
+                                Recent Activity
+                            </h3>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <div key={i} className="h-10 bg-zinc-200/30 dark:bg-zinc-800/30 rounded-lg animate-pulse" />
                                     ))}
                                 </div>
-                            ))}
-                        </div>
+                            ) : (
+                                <div className="space-y-1">
+                                    {recentEvents.map((event, i) => {
+                                        const { action, repo, icon } = getEventDescription(event);
+                                        return (
+                                            <div
+                                                key={event.id || i}
+                                                className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30 transition-colors group"
+                                            >
+                                                <div className="text-zinc-600 group-hover:text-indigo-400 transition-colors shrink-0">
+                                                    {icon}
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
+                                                        {action}{' '}
+                                                        <span className="text-indigo-400/80 font-mono text-xs">
+                                                            {repo}
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                                <span className="text-[10px] text-zinc-600 font-mono shrink-0">
+                                                    {timeAgo(event.created_at)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </motion.div>
+
+                        {/* Recent Repos */}
+                        <motion.div
+                            variants={fadeUp}
+                            className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6"
+                        >
+                            <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                <FolderGit2 size={14} className="text-indigo-400" />
+                                Recent Repositories
+                            </h3>
+                            {loading ? (
+                                <div className="space-y-3">
+                                    {[1, 2, 3, 4].map((i) => (
+                                        <div key={i} className="h-14 bg-zinc-200/30 dark:bg-zinc-800/30 rounded-lg animate-pulse" />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {repos.slice(0, 5).map((repo) => (
+                                        <a
+                                            key={repo.id}
+                                            href={repo.html_url}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="block py-3 px-3 rounded-lg hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30 transition-colors group"
+                                        >
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-indigo-400 transition-colors truncate">
+                                                    {repo.name}
+                                                </span>
+                                                <ExternalLink size={12} className="text-zinc-600 group-hover:text-indigo-400 transition-colors shrink-0" />
+                                            </div>
+                                            <div className="flex items-center gap-3 text-[11px] text-zinc-500">
+                                                {repo.language && (
+                                                    <span className="flex items-center gap-1">
+                                                        <span
+                                                            className="w-2 h-2 rounded-full"
+                                                            style={{ backgroundColor: langColors[repo.language] || '#8b8b8b' }}
+                                                        />
+                                                        {repo.language}
+                                                    </span>
+                                                )}
+                                                {repo.stargazers_count > 0 && (
+                                                    <span className="flex items-center gap-0.5">
+                                                        <Star size={10} /> {repo.stargazers_count}
+                                                    </span>
+                                                )}
+                                                {repo.forks_count > 0 && (
+                                                    <span className="flex items-center gap-0.5">
+                                                        <GitBranch size={10} /> {repo.forks_count}
+                                                    </span>
+                                                )}
+                                                <span className="font-mono">{timeAgo(repo.pushed_at)}</span>
+                                            </div>
+                                        </a>
+                                    ))}
+                                </div>
+                            )}
+                        </motion.div>
                     </div>
                 </div>
-            </div>
+            </Section>
+        );
+    };
 
-            {/* Footer: Legend + Total */}
-            <div className="flex items-center justify-between mt-4 pt-3 border-t border-zinc-200/30 dark:border-zinc-800/30">
-                <div className="flex items-center gap-4">
-                    <p className="text-xs text-zinc-600 font-mono">
-                        {totalContributions.toLocaleString()} contributions in the last year
-                    </p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] text-zinc-600 font-mono mr-1">Less</span>
-                    {cellColors.map((c, i) => (
-                        <div
-                            key={i}
-                            className={`w-[11px] h-[11px] rounded-[3px] border ${c} ${cellGlows[i]}`}
-                        />
-                    ))}
-                    <span className="text-[10px] text-zinc-600 font-mono ml-1">More</span>
-                </div>
-            </div>
-        </div>
-    );
-};
+    /* ═══════════════════════════════════════════════
+       TECH STACK SECTION
+       ═══════════════════════════════════════════════ */
+    const TECH_CATEGORIES = [
+        {
+            title: 'Frontend',
+            icon: <Layers size={20} />,
+            gradient: 'from-blue-500 to-cyan-500',
+            items: [
+                { name: 'HTML', slug: 'html5' },
+                { name: 'CSS', slug: 'css3' },
+                { name: 'JavaScript', slug: 'javascript' },
+                { name: 'React.js', slug: 'react' },
+                { name: 'Tailwind CSS', slug: 'tailwindcss' },
+                { name: 'GSAP', slug: 'greensock' },
+                { name: 'Locomotive.js', slug: 'javascript' }, // No official logo, using JS
+                { name: 'Spline', slug: 'threedotjs' }, // Using Three.js as proxy or maybe 'spline' if available (it is not standard in simpleicons yet, keeping threedotjs or just generic) -> actually Spline has no simpleicon, but 3D tools often use similar. Let's use 'webgl' or similar if needed, or just a generic one. Actually, 'spline' is not in simpleicons. Let's stick to 'threedotjs' or maybe 'opengl'. 'threedotjs' is fine as a 3D fallback.
+                { name: 'Flutter', slug: 'flutter' },
+                { name: 'Dart', slug: 'dart' },
+            ],
+        },
+        {
+            title: 'Backend',
+            icon: <Terminal size={20} />,
+            gradient: 'from-emerald-500 to-green-500',
+            items: [
+                { name: 'Node.js', slug: 'nodedotjs' },
+                { name: 'Express.js', slug: 'express' },
+                { name: 'WebSockets', slug: 'socketdotio' }, // Using socket.io as a proxy for WS
+            ],
+        },
+        {
+            title: 'Web3',
+            icon: <GitBranch size={20} />,
+            gradient: 'from-violet-500 to-purple-500',
+            items: [
+                { name: 'Solana', slug: 'solana' },
+                { name: '@solana/web3.js', slug: 'solana' },
+                { name: 'Wallet Adapter', slug: 'walletconnect' }, // WalletConnect is a good proxy for adapter
+            ],
+        },
+        {
+            title: 'Tools & Platforms',
+            icon: <Code2 size={20} />,
+            gradient: 'from-orange-500 to-amber-500',
+            items: [
+                { name: 'Git', slug: 'git' },
+                { name: 'GitHub', slug: 'github' },
+                { name: 'Docker', slug: 'docker' },
+                { name: 'AWS', slug: 'amazonaws' },
+                { name: 'Vercel', slug: 'vercel' },
+                { name: 'Netlify', slug: 'netlify' },
+                { name: 'Figma', slug: 'figma' },
+            ],
+        },
+    ];
 
-const GitHubSection = () => {
-    const { profile, events, repos, loading } = useGitHubData();
-
-    // Deduplicate events for display (max 8)
-    const recentEvents = events.slice(0, 8);
-
-    return (
-        <Section id="github" className="py-12 md:py-16">
+    const TechStackSection = () => (
+        <Section id="stack" className="py-12 md:py-16 relative">
             <div className="max-w-6xl mx-auto px-6">
-                <motion.div variants={fadeUp} className="mb-8">
+                <motion.div variants={fadeUp} className="mb-8 text-center">
                     <span className="inline-flex items-center gap-2 text-sm font-mono text-indigo-400 mb-3">
-                        <GitBranch size={14} />
-                        OPEN SOURCE
+                        <Layers size={14} />
+                        TECH STACK
                     </span>
                     <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
-                        GitHub <span className="text-gradient">Activity</span>
+                        Tools & <span className="text-gradient">Technologies</span>
                     </h2>
+                    <p className="mt-4 text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto text-base sm:text-lg">
+                        The development suite I use to build robust, scalable, and interactive applications.
+                    </p>
                 </motion.div>
 
-                {/* Stats Row — real data */}
-                <motion.div
-                    variants={fadeUp}
-                    className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
-                >
-                    {[
-                        { icon: <Code2 size={16} />, label: 'Public Repos', value: loading ? '—' : profile?.public_repos },
-                        { icon: <Star size={16} />, label: 'Followers', value: loading ? '—' : profile?.followers },
-                        { icon: <GitBranch size={16} />, label: 'Following', value: loading ? '—' : profile?.following },
-                        { icon: <GitCommit size={16} />, label: 'Recent Events', value: loading ? '—' : events.length + '+' },
-                    ].map((stat) => (
-                        <div
-                            key={stat.label}
-                            className="flex items-center gap-3 p-4 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors"
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-4">
+                    {TECH_CATEGORIES.map((cat, catIdx) => (
+                        <motion.div
+                            key={cat.title}
+                            variants={fadeUp}
+                            custom={catIdx}
+                            className="group relative rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/30 dark:bg-zinc-900/30 p-6 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 hover:border-zinc-300/60 dark:hover:border-zinc-700/60 transition-all duration-500 overflow-hidden"
                         >
-                            <div className="p-2 rounded-lg bg-zinc-100/50 dark:bg-zinc-800/50 text-indigo-400">
-                                {stat.icon}
-                            </div>
-                            <div>
-                                <p className="text-xl font-bold text-zinc-900 dark:text-white">{stat.value}</p>
-                                <p className="text-xs text-zinc-500">{stat.label}</p>
-                            </div>
-                        </div>
-                    ))}
-                </motion.div>
+                            {/* Gradient Glow Background */}
+                            <div className={`absolute -inset-2 bg-gradient-to-br ${cat.gradient} opacity-0 group-hover:opacity-10 blur-xl transition-opacity duration-500`} />
 
-                {/* Contribution Graph — Custom Interactive Calendar */}
-                <motion.div
-                    variants={fadeUp}
-                    className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6 mb-6 overflow-hidden"
-                >
-                    <div className="flex items-center justify-between mb-5">
-                        <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                            <GitCommit size={14} className="text-indigo-400" />
-                            Contribution Graph
-                        </h3>
-                        <a
-                            href={`https://github.com/${GITHUB_USERNAME}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-mono"
-                        >
-                            <Github size={12} />
-                            @{GITHUB_USERNAME}
-                            <ArrowUpRight size={10} />
-                        </a>
-                    </div>
-                    <ContributionCalendar username={GITHUB_USERNAME} />
-                </motion.div>
+                            {/* Category Header */}
+                            <div className="relative flex items-center gap-3 mb-6">
+                                <div className={`p-2.5 rounded-xl bg-gradient-to-br ${cat.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                                    {cat.icon}
+                                </div>
+                                <h3 className="text-base font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors tracking-wide">
+                                    {cat.title}
+                                </h3>
+                            </div>
 
-                {/* Two-column: Recent Activity + Recent Repos */}
-                <div className="grid md:grid-cols-2 gap-6 md:gap-4">
-                    {/* Recent Activity */}
-                    <motion.div
-                        variants={fadeUp}
-                        className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6"
-                    >
-                        <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <Terminal size={14} className="text-indigo-400" />
-                            Recent Activity
-                        </h3>
-                        {loading ? (
-                            <div className="space-y-3">
-                                {[1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="h-10 bg-zinc-200/30 dark:bg-zinc-800/30 rounded-lg animate-pulse" />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="space-y-1">
-                                {recentEvents.map((event, i) => {
-                                    const { action, repo, icon } = getEventDescription(event);
-                                    return (
-                                        <div
-                                            key={event.id || i}
-                                            className="flex items-center gap-3 py-2.5 px-3 rounded-lg hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30 transition-colors group"
-                                        >
-                                            <div className="text-zinc-600 group-hover:text-indigo-400 transition-colors shrink-0">
-                                                {icon}
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm text-zinc-700 dark:text-zinc-300 truncate">
-                                                    {action}{' '}
-                                                    <span className="text-indigo-400/80 font-mono text-xs">
-                                                        {repo}
-                                                    </span>
-                                                </p>
-                                            </div>
-                                            <span className="text-[10px] text-zinc-600 font-mono shrink-0">
-                                                {timeAgo(event.created_at)}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </motion.div>
-
-                    {/* Recent Repos */}
-                    <motion.div
-                        variants={fadeUp}
-                        className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6"
-                    >
-                        <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-                            <FolderGit2 size={14} className="text-indigo-400" />
-                            Recent Repositories
-                        </h3>
-                        {loading ? (
-                            <div className="space-y-3">
-                                {[1, 2, 3, 4].map((i) => (
-                                    <div key={i} className="h-14 bg-zinc-200/30 dark:bg-zinc-800/30 rounded-lg animate-pulse" />
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {repos.slice(0, 5).map((repo) => (
-                                    <a
-                                        key={repo.id}
-                                        href={repo.html_url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="block py-3 px-3 rounded-lg hover:bg-zinc-100/50 dark:hover:bg-zinc-800/30 transition-colors group"
+                            {/* Tech Items List */}
+                            <div className="relative flex flex-wrap gap-2.5">
+                                {cat.items.map((item) => (
+                                    <div
+                                        key={item.name}
+                                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100/40 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800/60 hover:bg-zinc-200/80 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-white transition-all duration-300 cursor-default group/item"
                                     >
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-indigo-400 transition-colors truncate">
-                                                {repo.name}
-                                            </span>
-                                            <ExternalLink size={12} className="text-zinc-600 group-hover:text-indigo-400 transition-colors shrink-0" />
-                                        </div>
-                                        <div className="flex items-center gap-3 text-[11px] text-zinc-500">
-                                            {repo.language && (
-                                                <span className="flex items-center gap-1">
-                                                    <span
-                                                        className="w-2 h-2 rounded-full"
-                                                        style={{ backgroundColor: langColors[repo.language] || '#8b8b8b' }}
-                                                    />
-                                                    {repo.language}
-                                                </span>
-                                            )}
-                                            {repo.stargazers_count > 0 && (
-                                                <span className="flex items-center gap-0.5">
-                                                    <Star size={10} /> {repo.stargazers_count}
-                                                </span>
-                                            )}
-                                            {repo.forks_count > 0 && (
-                                                <span className="flex items-center gap-0.5">
-                                                    <GitBranch size={10} /> {repo.forks_count}
-                                                </span>
-                                            )}
-                                            <span className="font-mono">{timeAgo(repo.pushed_at)}</span>
-                                        </div>
-                                    </a>
+                                        <img
+                                            src={`https://cdn.simpleicons.org/${item.slug}/${['github', 'express', 'vercel', 'nodedotjs', 'three.js', 'socket.io'].includes(item.slug) ? 'white' : ''}`}
+                                            alt={item.name}
+                                            className="w-4 h-4 opacity-70 group-hover/item:opacity-100 transition-opacity grayscale group-hover/item:grayscale-0"
+                                            loading="lazy"
+                                            onError={(e) => {
+                                                e.target.style.display = 'none'; // Fallback if icon fails
+                                            }}
+                                        />
+                                        <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 group-hover/item:text-zinc-900 dark:group-hover/item:text-zinc-200 transition-colors">
+                                            {item.name}
+                                        </span>
+                                    </div>
                                 ))}
                             </div>
-                        )}
-                    </motion.div>
+                        </motion.div>
+                    ))}
                 </div>
             </div>
         </Section>
     );
-};
 
-/* ═══════════════════════════════════════════════
-   TECH STACK SECTION
-   ═══════════════════════════════════════════════ */
-const TECH_CATEGORIES = [
-    {
-        title: 'Frontend',
-        icon: <Layers size={20} />,
-        gradient: 'from-blue-500 to-cyan-500',
-        items: [
-            { name: 'HTML', slug: 'html5' },
-            { name: 'CSS', slug: 'css3' },
-            { name: 'JavaScript', slug: 'javascript' },
-            { name: 'React.js', slug: 'react' },
-            { name: 'Tailwind CSS', slug: 'tailwindcss' },
-            { name: 'GSAP', slug: 'greensock' },
-            { name: 'Locomotive.js', slug: 'javascript' }, // No official logo, using JS
-            { name: 'Spline', slug: 'threedotjs' }, // Using Three.js as proxy or maybe 'spline' if available (it is not standard in simpleicons yet, keeping threedotjs or just generic) -> actually Spline has no simpleicon, but 3D tools often use similar. Let's use 'webgl' or similar if needed, or just a generic one. Actually, 'spline' is not in simpleicons. Let's stick to 'threedotjs' or maybe 'opengl'. 'threedotjs' is fine as a 3D fallback.
-            { name: 'Flutter', slug: 'flutter' },
-            { name: 'Dart', slug: 'dart' },
-        ],
-    },
-    {
-        title: 'Backend',
-        icon: <Terminal size={20} />,
-        gradient: 'from-emerald-500 to-green-500',
-        items: [
-            { name: 'Node.js', slug: 'nodedotjs' },
-            { name: 'Express.js', slug: 'express' },
-            { name: 'WebSockets', slug: 'socketdotio' }, // Using socket.io as a proxy for WS
-        ],
-    },
-    {
-        title: 'Web3',
-        icon: <GitBranch size={20} />,
-        gradient: 'from-violet-500 to-purple-500',
-        items: [
-            { name: 'Solana', slug: 'solana' },
-            { name: '@solana/web3.js', slug: 'solana' },
-            { name: 'Wallet Adapter', slug: 'walletconnect' }, // WalletConnect is a good proxy for adapter
-        ],
-    },
-    {
-        title: 'Tools & Platforms',
-        icon: <Code2 size={20} />,
-        gradient: 'from-orange-500 to-amber-500',
-        items: [
-            { name: 'Git', slug: 'git' },
-            { name: 'GitHub', slug: 'github' },
-            { name: 'Docker', slug: 'docker' },
-            { name: 'AWS', slug: 'amazonaws' },
-            { name: 'Vercel', slug: 'vercel' },
-            { name: 'Netlify', slug: 'netlify' },
-            { name: 'Figma', slug: 'figma' },
-        ],
-    },
-];
-
-const TechStackSection = () => (
-    <Section id="stack" className="py-12 md:py-16 relative">
-        <div className="max-w-6xl mx-auto px-6">
-            <motion.div variants={fadeUp} className="mb-8 text-center">
-                <span className="inline-flex items-center gap-2 text-sm font-mono text-indigo-400 mb-3">
-                    <Layers size={14} />
-                    TECH STACK
-                </span>
-                <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
-                    Tools & <span className="text-gradient">Technologies</span>
-                </h2>
-                <p className="mt-4 text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto text-base sm:text-lg">
-                    The development suite I use to build robust, scalable, and interactive applications.
-                </p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-4">
-                {TECH_CATEGORIES.map((cat, catIdx) => (
-                    <motion.div
-                        key={cat.title}
-                        variants={fadeUp}
-                        custom={catIdx}
-                        className="group relative rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/30 dark:bg-zinc-900/30 p-6 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 hover:border-zinc-300/60 dark:hover:border-zinc-700/60 transition-all duration-500 overflow-hidden"
-                    >
-                        {/* Gradient Glow Background */}
-                        <div className={`absolute -inset-2 bg-gradient-to-br ${cat.gradient} opacity-0 group-hover:opacity-10 blur-xl transition-opacity duration-500`} />
-
-                        {/* Category Header */}
-                        <div className="relative flex items-center gap-3 mb-6">
-                            <div className={`p-2.5 rounded-xl bg-gradient-to-br ${cat.gradient} text-white shadow-lg group-hover:scale-110 transition-transform duration-300`}>
-                                {cat.icon}
+    /* ═══════════════════════════════════════════════
+       FOOTER
+       ═══════════════════════════════════════════════ */
+    const Footer = () => (
+        <footer className="relative border-t border-zinc-200/50 dark:border-zinc-800/50">
+            <div className="max-w-6xl mx-auto px-6 py-12">
+                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                    {/* Left */}
+                    <div className="text-center md:text-left">
+                        <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
+                            <div className="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-[10px]">
+                                A
                             </div>
-                            <h3 className="text-base font-bold text-zinc-700 dark:text-zinc-200 group-hover:text-zinc-900 dark:group-hover:text-white transition-colors tracking-wide">
-                                {cat.title}
-                            </h3>
+                            <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+                                Ayush Kumar Jha
+                            </span>
                         </div>
-
-                        {/* Tech Items List */}
-                        <div className="relative flex flex-wrap gap-2.5">
-                            {cat.items.map((item) => (
-                                <div
-                                    key={item.name}
-                                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-100/40 dark:bg-zinc-800/40 border border-zinc-200/60 dark:border-zinc-800/60 hover:bg-zinc-200/80 dark:hover:bg-zinc-800/80 hover:border-zinc-300 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-white transition-all duration-300 cursor-default group/item"
-                                >
-                                    <img
-                                        src={`https://cdn.simpleicons.org/${item.slug}/${['github', 'express', 'vercel', 'nodedotjs', 'three.js', 'socket.io'].includes(item.slug) ? 'white' : ''}`}
-                                        alt={item.name}
-                                        className="w-4 h-4 opacity-70 group-hover/item:opacity-100 transition-opacity grayscale group-hover/item:grayscale-0"
-                                        loading="lazy"
-                                        onError={(e) => {
-                                            e.target.style.display = 'none'; // Fallback if icon fails
-                                        }}
-                                    />
-                                    <span className="text-xs font-medium text-zinc-500 dark:text-zinc-400 group-hover/item:text-zinc-900 dark:group-hover/item:text-zinc-200 transition-colors">
-                                        {item.name}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    </motion.div>
-                ))}
-            </div>
-        </div>
-    </Section>
-);
-
-/* ═══════════════════════════════════════════════
-   FOOTER
-   ═══════════════════════════════════════════════ */
-const Footer = () => (
-    <footer className="relative border-t border-zinc-200/50 dark:border-zinc-800/50">
-        <div className="max-w-6xl mx-auto px-6 py-12">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                {/* Left */}
-                <div className="text-center md:text-left">
-                    <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-[10px]">
-                            A
-                        </div>
-                        <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                            Ayush Kumar Jha
-                        </span>
+                        <p className="text-xs text-zinc-600">
+                            Building for the modern web. Crafted with React & Tailwind CSS.
+                        </p>
                     </div>
-                    <p className="text-xs text-zinc-600">
-                        Building for the modern web. Crafted with React & Tailwind CSS.
+
+                    {/* Center Links */}
+                    <div className="flex items-center gap-6 text-sm text-zinc-500">
+                        {NAV_LINKS.map((l) => (
+                            <a key={l.label} href={l.href} className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
+                                {l.label}
+                            </a>
+                        ))}
+                    </div>
+
+                    {/* Right Social */}
+                    <div className="flex items-center gap-2">
+                        {[
+                            { icon: <Github size={16} />, href: 'https://github.com/ayushjava07' },
+                            { icon: <Linkedin size={16} />, href: 'https://www.linkedin.com/in/ayush-kumar-jha-09257b2b2/' },
+                            { icon: <Twitter size={16} />, href: 'https://x.com/Ayushdev_01' },
+                            { icon: <Mail size={16} />, href: 'mailto:ayushjhasahab07@gmail.com' },
+                        ].map((s, i) => (
+                            <a
+                                key={i}
+                                href={s.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2 rounded-lg text-zinc-400 dark:text-zinc-600 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 transition-all duration-300"
+                            >
+                                {s.icon}
+                            </a>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="mt-8 pt-6 border-t border-zinc-200/30 dark:border-zinc-800/30 text-center">
+                    <p className="text-xs text-zinc-700">
+                        © {new Date().getFullYear()} Ayush Kumar Jha. All rights reserved.
                     </p>
                 </div>
-
-                {/* Center Links */}
-                <div className="flex items-center gap-6 text-sm text-zinc-500">
-                    {NAV_LINKS.map((l) => (
-                        <a key={l.label} href={l.href} className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
-                            {l.label}
-                        </a>
-                    ))}
-                </div>
-
-                {/* Right Social */}
-                <div className="flex items-center gap-2">
-                    {[
-                        { icon: <Github size={16} />, href: 'https://github.com/ayushjava07' },
-                        { icon: <Linkedin size={16} />, href: 'https://www.linkedin.com/in/ayush-kumar-jha-09257b2b2/' },
-                        { icon: <Twitter size={16} />, href: 'https://x.com/Ayushdev_01' },
-                        { icon: <Mail size={16} />, href: 'mailto:ayushjhasahab07@gmail.com' },
-                    ].map((s, i) => (
-                        <a
-                            key={i}
-                            href={s.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="p-2 rounded-lg text-zinc-400 dark:text-zinc-600 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100/50 dark:hover:bg-zinc-800/50 transition-all duration-300"
-                        >
-                            {s.icon}
-                        </a>
-                    ))}
-                </div>
             </div>
-
-            <div className="mt-8 pt-6 border-t border-zinc-200/30 dark:border-zinc-800/30 text-center">
-                <p className="text-xs text-zinc-700">
-                    © {new Date().getFullYear()} Ayush Kumar Jha. All rights reserved.
-                </p>
-            </div>
-        </div>
-    </footer>
-);
-
-/* ═══════════════════════════════════════════════
-   MAIN PORTFOLIO COMPONENT
-   ═══════════════════════════════════════════════ */
-const Portfolio = () => {
-    return (
-        <div className="relative min-h-screen bg-white dark:bg-[#09090b] text-zinc-900 dark:text-white noise">
-            <Navbar />
-            <HeroSection />
-            <ExperienceSection />
-            <ProjectsSection />
-            <GitHubSection />
-            <TechStackSection />
-            <Footer />
-        </div>
+        </footer>
     );
-};
 
-export default Portfolio;
+    /* ═══════════════════════════════════════════════
+       MAIN PORTFOLIO COMPONENT
+       ═══════════════════════════════════════════════ */
+    const Portfolio = () => {
+        return (
+            <div className="relative min-h-screen bg-white dark:bg-[#09090b] text-zinc-900 dark:text-white noise">
+                <Navbar />
+                <HeroSection />
+                <ExperienceSection />
+                <ProjectsSection />
+                <GitHubSection />
+                <TechStackSection />
+                <Footer />
+            </div>
+        );
+    };
+
+    export default Portfolio;
