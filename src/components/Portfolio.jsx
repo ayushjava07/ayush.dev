@@ -226,7 +226,7 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.4, 0.25, 1] }}
-                    className="text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] font-black tracking-tight leading-[1.05] mb-3"
+                    className="text-6xl sm:text-7xl md:text-8xl lg:text-[6rem] font-black tracking-tight leading-[1.05] mb-4"
                 >
                     <span className="text-zinc-900 dark:text-white">Ayush Kumar</span>{' '}
                     <span className="text-gradient">Jha</span>
@@ -237,7 +237,7 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.35 }}
-                    className="text-lg sm:text-xl md:text-2xl text-zinc-500 dark:text-zinc-400 font-light tracking-wide mb-4"
+                    className="text-xl sm:text-2xl md:text-3xl text-zinc-500 dark:text-zinc-400 font-light tracking-wide mb-5"
                 >
                     Web Developer & Web3 Enthusiast
                 </motion.p>
@@ -247,7 +247,7 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.45 }}
-                    className="text-base sm:text-lg text-zinc-500 dark:text-zinc-500 leading-relaxed max-w-xl mb-6"
+                    className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-500 leading-relaxed max-w-xl mb-8"
                 >
                     Building interactive, high-performance web applications with a focus on
                     clean UI/UX, frontend animations, open-source, and Solana-based projects.
@@ -474,7 +474,7 @@ const ExperienceSection = () => (
                     <Briefcase size={14} />
                     EXPERIENCE
                 </span>
-                <h2 className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-white">
+                <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
                     Where I've <span className="text-gradient">Contributed</span>
                 </h2>
             </motion.div>
@@ -556,13 +556,13 @@ const ProjectCard = ({ project, index }) => (
                 </div>
 
                 {/* Title */}
-                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-1 group-hover:text-gradient transition-all duration-300">
+                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 group-hover:text-gradient transition-all duration-300">
                     {project.title}
                 </h3>
-                <p className="text-indigo-400/80 text-sm font-medium mb-3">{project.subtitle}</p>
+                <p className="text-indigo-400/80 text-base font-medium mb-3">{project.subtitle}</p>
 
                 {/* Description */}
-                <p className="text-zinc-500 dark:text-zinc-400 text-sm leading-relaxed mb-6 flex-grow">
+                <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed mb-6 flex-grow">
                     {project.description}
                 </p>
 
@@ -590,12 +590,12 @@ const ProjectsSection = () => (
                     <FolderGit2 size={14} />
                     FEATURED PROJECTS
                 </span>
-                <h2 className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-white">
+                <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
                     Things I've <span className="text-gradient">Built</span>
                 </h2>
             </motion.div>
 
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid md:grid-cols-2 gap-6 md:gap-4">
                 {PROJECTS.map((p, i) => (
                     <ProjectCard key={p.title} project={p} index={i} />
                 ))}
@@ -1023,7 +1023,7 @@ const GitHubSection = () => {
                         <GitBranch size={14} />
                         OPEN SOURCE
                     </span>
-                    <h2 className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-white">
+                    <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
                         GitHub <span className="text-gradient">Activity</span>
                     </h2>
                 </motion.div>
@@ -1079,7 +1079,7 @@ const GitHubSection = () => {
                 </motion.div>
 
                 {/* Two-column: Recent Activity + Recent Repos */}
-                <div className="grid md:grid-cols-2 gap-4">
+                <div className="grid md:grid-cols-2 gap-6 md:gap-4">
                     {/* Recent Activity */}
                     <motion.div
                         variants={fadeUp}
@@ -1254,15 +1254,15 @@ const TechStackSection = () => (
                     <Layers size={14} />
                     TECH STACK
                 </span>
-                <h2 className="text-3xl sm:text-4xl font-bold text-zinc-900 dark:text-white">
+                <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
                     Tools & <span className="text-gradient">Technologies</span>
                 </h2>
-                <p className="mt-4 text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto text-sm sm:text-base">
+                <p className="mt-4 text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto text-base sm:text-lg">
                     The development suite I use to build robust, scalable, and interactive applications.
                 </p>
             </motion.div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-4">
                 {TECH_CATEGORIES.map((cat, catIdx) => (
                     <motion.div
                         key={cat.title}
