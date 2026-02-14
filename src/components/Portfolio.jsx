@@ -528,14 +528,20 @@ const PROJECTS = [
         gradient: 'from-green-500 via-emerald-500 to-teal-500',
         icon: '△',
     },
+    {
+        title: 'Aayam 2026',
+        subtitle: 'Techno-Management Fest Website',
+        description:
+            'The official website for Aayam 2026. Built with a focus on modern UI/UX, responsiveness, and smooth animations.',
+        tech: ['React.js', 'Tailwind CSS', 'Framer Motion'],
+        gradient: 'from-pink-500 via-rose-500 to-red-500',
+        icon: '★',
+        link: 'https://aayam.nitagymkhana.com/',
+    },
 ];
 
-const ProjectCard = ({ project, index }) => (
-    <motion.div
-        variants={fadeUp}
-        custom={index}
-        className="group relative"
-    >
+const ProjectCard = ({ project, index }) => {
+    const CardContent = () => (
         <div className="relative h-full rounded-2xl border border-zinc-200 dark:border-zinc-800/50 bg-white dark:bg-zinc-900/30 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/60 hover:border-zinc-300 dark:hover:border-zinc-700/60 transition-all duration-500 overflow-hidden hover:shadow-lg hover:shadow-zinc-200/50 dark:hover:shadow-black/20">
             {/* Top gradient shimmer */}
             <div className={`h-[2px] w-full bg-gradient-to-r ${project.gradient} opacity-40 group-hover:opacity-80 transition-opacity duration-500`} />
@@ -551,7 +557,7 @@ const ProjectCard = ({ project, index }) => (
                     </div>
                     <ExternalLink
                         size={18}
-                        className="text-zinc-600 group-hover:text-indigo-400 transition-colors duration-300"
+                        className="text-zinc-600 group-hover:text-gold-400 transition-colors duration-300"
                     />
                 </div>
 
@@ -579,8 +585,33 @@ const ProjectCard = ({ project, index }) => (
                 </div>
             </div>
         </div>
-    </motion.div>
-);
+    );
+
+    if (project.link) {
+        return (
+            <motion.a
+                href={project.link}
+                target="_blank"
+                rel="noopener noreferrer"
+                variants={fadeUp}
+                custom={index}
+                className="group relative block h-full"
+            >
+                <CardContent />
+            </motion.a>
+        );
+    }
+
+    return (
+        <motion.div
+            variants={fadeUp}
+            custom={index}
+            className="group relative h-full"
+        >
+            <CardContent />
+        </motion.div>
+    );
+};
 
 const ProjectsSection = () => (
     <Section id="projects" className="py-12 md:py-16">
