@@ -23,6 +23,7 @@ import {
     X,
 } from 'lucide-react';
 import ThemeSelector from './ThemeSelector';
+import { EXPERIENCES, IMPACT, JOURNEY, PROJECTS, SITE } from '../content/portfolio';
 
 /* ═══════════════════════════════════════════════
    ANIMATION VARIANTS
@@ -59,6 +60,40 @@ const scaleIn = {
 };
 
 /* ═══════════════════════════════════════════════
+   ACTIVE SECTION (for nav highlighting)
+   ═══════════════════════════════════════════════ */
+const useActiveSection = (sectionIds, offsetPx = 120) => {
+    const [active, setActive] = useState(sectionIds?.[0] || 'home');
+
+    useEffect(() => {
+        if (!sectionIds?.length) return;
+
+        const els = sectionIds
+            .map((id) => document.getElementById(id))
+            .filter(Boolean);
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const visible = entries
+                    .filter((e) => e.isIntersecting)
+                    .sort((a, b) => (b.intersectionRatio || 0) - (a.intersectionRatio || 0));
+                if (visible[0]?.target?.id) setActive(visible[0].target.id);
+            },
+            {
+                root: null,
+                rootMargin: `-${offsetPx}px 0px -60% 0px`,
+                threshold: [0.08, 0.12, 0.2, 0.3],
+            }
+        );
+
+        els.forEach((el) => observer.observe(el));
+        return () => observer.disconnect();
+    }, [sectionIds, offsetPx]);
+
+    return active;
+};
+
+/* ═══════════════════════════════════════════════
    SECTION WRAPPER (scroll-triggered animation)
    ═══════════════════════════════════════════════ */
 const Section = ({ children, id, className = '' }) => {
@@ -83,16 +118,19 @@ const Section = ({ children, id, className = '' }) => {
    NAVIGATION BAR
    ═══════════════════════════════════════════════ */
 const NAV_LINKS = [
-    { label: 'About', href: '#about' },
-    { label: 'Experience', href: '#experience' },
-    { label: 'Projects', href: '#projects' },
-    { label: 'GitHub', href: '#github' },
-    { label: 'Stack', href: '#stack' },
+    { label: 'Home', href: '#home', id: 'home' },
+    { label: 'About', href: '#about', id: 'about' },
+    { label: 'Projects', href: '#projects', id: 'projects' },
+    { label: 'Proof', href: '#proof', id: 'proof' },
+    { label: 'Experience', href: '#experience', id: 'experience' },
+    { label: 'Skills', href: '#stack', id: 'stack' },
+    { label: 'Contact', href: '#contact', id: 'contact' },
 ];
 
 const Navbar = () => {
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const active = useActiveSection(NAV_LINKS.map((l) => l.id));
 
     useEffect(() => {
         const handle = () => setScrolled(window.scrollY > 20);
@@ -109,12 +147,12 @@ const Navbar = () => {
         >
             <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
                 {/* Logo */}
-                <a href="#" className="relative group flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-sm">
-                        A
+                <a href="#home" className="relative group flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-orange-500 to-violet-500 flex items-center justify-center text-white font-bold text-sm">
+                        {SITE.name.split(' ')[0]?.[0] || 'A'}
                     </div>
                     <span className="font-semibold text-zinc-900 dark:text-white tracking-tight hidden sm:inline">
-                        ayush<span className="text-indigo-400">.dev</span>
+                        {SITE.domain?.split('.')[0] || 'ayush'}<span className="text-gradient">.dev</span>
                     </span>
                 </a>
 
@@ -124,9 +162,15 @@ const Navbar = () => {
                         <a
                             key={link.label}
                             href={link.href}
-                            className="px-3 py-1.5 text-sm text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800/50 transition-all duration-300"
+                            className={`relative px-3 py-1.5 text-sm rounded-lg transition-all duration-300 ${active === link.id
+                                ? 'text-zinc-900 dark:text-white bg-zinc-100/70 dark:bg-zinc-800/50'
+                                : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
+                                }`}
                         >
                             {link.label}
+                            {active === link.id && (
+                                <span className="absolute -bottom-1 left-3 right-3 h-[2px] bg-gradient-to-r from-orange-400 via-fuchsia-400 to-violet-400 rounded-full" />
+                            )}
                         </a>
                     ))}
                 </nav>
@@ -134,11 +178,11 @@ const Navbar = () => {
                 {/* CTA + Theme Toggle + Mobile Toggle */}
                 <div className="flex items-center gap-3">
                     <a
-                        href="mailto:ayushjhasahab07@gmail.com"
-                        className="hidden md:inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white hover:from-indigo-500 hover:to-violet-500 transition-all duration-300 hover:shadow-lg hover:shadow-indigo-500/20"
+                        href="#projects"
+                        className="hidden md:inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-orange-500 to-violet-600 text-white hover:from-orange-400 hover:to-violet-500 transition-all duration-300 hover:shadow-lg hover:shadow-orange-500/15"
                     >
-                        <Mail size={14} />
-                        Get in Touch
+                        <FolderGit2 size={14} />
+                        View Projects
                     </a>
 
                     <ThemeSelector />
@@ -171,10 +215,11 @@ const Navbar = () => {
                         </a>
                     ))}
                     <a
-                        href="mailto:ayushjhasahab07@gmail.com"
-                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-indigo-600 to-violet-600 text-white"
+                        href="#contact"
+                        onClick={() => setMobileOpen(false)}
+                        className="mt-4 inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gradient-to-r from-orange-500 to-violet-600 text-white"
                     >
-                        <Mail size={14} /> Get in Touch
+                        <Mail size={14} /> Contact
                     </a>
                 </motion.div>
             )}
@@ -183,7 +228,7 @@ const Navbar = () => {
 };
 
 /* ═══════════════════════════════════════════════
-   HERO / ABOUT SECTION — Center-aligned Minimal
+   HERO SECTION — bold, minimal, terminal vibes
    ═══════════════════════════════════════════════ */
 const HeroSection = () => {
     const ref = useRef(null);
@@ -194,31 +239,32 @@ const HeroSection = () => {
     const yBg = useTransform(scrollYProgress, [0, 1], ['0%', '50%']);
 
     return (
-        <section ref={ref} id="about" className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
+        <section ref={ref} id="home" className="relative min-h-screen flex items-center justify-center pt-16 overflow-hidden">
             {/* Ambient background blobs */}
             <motion.div style={{ y: yBg }} className="absolute inset-0 pointer-events-none">
-                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[600px] rounded-full bg-indigo-500/20 dark:bg-indigo-600/8 blur-[140px] animate-blob" />
-                <div className="absolute top-1/2 -left-20 w-[350px] h-[350px] rounded-full bg-violet-500/20 dark:bg-violet-600/6 blur-[120px] animate-blob animation-delay-2000" />
-                <div className="absolute bottom-1/4 right-0 w-[300px] h-[300px] rounded-full bg-blue-500/20 dark:bg-blue-600/6 blur-[100px] animate-blob animation-delay-4000" />
+                <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[640px] h-[640px] rounded-full bg-orange-500/20 dark:bg-orange-500/10 blur-[150px] animate-blob" />
+                <div className="absolute top-1/2 -left-24 w-[420px] h-[420px] rounded-full bg-violet-500/20 dark:bg-violet-500/10 blur-[130px] animate-blob animation-delay-2000" />
+                <div className="absolute bottom-1/4 right-0 w-[360px] h-[360px] rounded-full bg-fuchsia-500/15 dark:bg-fuchsia-500/8 blur-[120px] animate-blob animation-delay-4000" />
             </motion.div>
 
             {/* Subtle grid overlay */}
             <div className="absolute inset-0 bg-grid opacity-20 pointer-events-none" />
 
             {/* Content — all center-aligned */}
-            <div className="relative max-w-3xl mx-auto px-6 py-10 md:py-16 w-full flex flex-col items-center text-center">
+            <div className="relative max-w-5xl mx-auto px-6 py-10 md:py-16 w-full">
+                <div className="grid lg:grid-cols-12 gap-8 items-center">
                 {/* Availability badge */}
                 <motion.div
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.1 }}
-                    className="inline-flex items-center gap-2.5 px-4 py-2 mb-6 rounded-full border border-zinc-200 dark:border-zinc-800/80 bg-white/80 dark:bg-zinc-900/40 backdrop-blur-sm text-sm text-zinc-600 dark:text-zinc-400 shadow-sm dark:shadow-none"
+                    className="lg:col-span-7 inline-flex w-fit items-center gap-2.5 px-4 py-2 mb-6 rounded-full border border-zinc-200/70 dark:border-zinc-800/80 bg-white/70 dark:bg-zinc-900/35 backdrop-blur-sm text-xs font-mono text-zinc-600 dark:text-zinc-400 shadow-sm dark:shadow-none"
                 >
                     <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
                     </span>
-                    Available for opportunities
+                    open to internships • freelance
                 </motion.div>
 
                 {/* Name — prominent, center */}
@@ -226,10 +272,10 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 30 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.7, delay: 0.2, ease: [0.25, 0.4, 0.25, 1] }}
-                    className="text-6xl sm:text-7xl md:text-8xl lg:text-[6rem] font-black tracking-tight leading-[1.05] mb-4"
+                    className="lg:col-span-7 text-5xl sm:text-6xl md:text-7xl lg:text-[5.2rem] font-black tracking-tight leading-[1.04] mb-4 text-left"
                 >
-                    <span className="text-zinc-900 dark:text-white">Ayush Kumar</span>{' '}
-                    <span className="text-gradient">Jha</span>
+                    <span className="text-zinc-900 dark:text-white">{SITE.name.split(' ').slice(0, 2).join(' ')}</span>{' '}
+                    <span className="text-gradient-shimmer">{SITE.name.split(' ').slice(2).join(' ')}</span>
                 </motion.h1>
 
                 {/* Subtitle — single line */}
@@ -237,9 +283,9 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.35 }}
-                    className="text-xl sm:text-2xl md:text-3xl text-zinc-500 dark:text-zinc-400 font-light tracking-wide mb-5"
+                    className="lg:col-span-7 text-lg sm:text-xl md:text-2xl text-zinc-500 dark:text-zinc-400 font-light tracking-wide mb-4 text-left"
                 >
-                    Web Developer & Web3 Enthusiast
+                    <span className="text-zinc-600 dark:text-zinc-300">{SITE.role}</span>
                 </motion.p>
 
                 {/* Description — max 2 lines */}
@@ -247,10 +293,9 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 18 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.45 }}
-                    className="text-lg sm:text-xl text-zinc-500 dark:text-zinc-500 leading-relaxed max-w-xl mb-8"
+                    className="lg:col-span-7 text-base sm:text-lg text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-2xl mb-7 text-left"
                 >
-                    Building interactive, high-performance web applications with a focus on
-                    clean UI/UX, frontend animations, open-source, and Solana-based projects.
+                    {SITE.intro}
                 </motion.p>
 
                 {/* CTA Buttons — centered row */}
@@ -258,23 +303,21 @@ const HeroSection = () => {
                     initial={{ opacity: 0, y: 16 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ duration: 0.6, delay: 0.55 }}
-                    className="flex flex-wrap justify-center gap-4 mb-6"
+                    className="lg:col-span-7 flex flex-wrap justify-start gap-3 mb-7"
                 >
                     <a
-                        href="mailto:ayushjhasahab07@gmail.com"
-                        className="group inline-flex items-center gap-2.5 px-7 py-3 rounded-full bg-gradient-to-r from-indigo-600 to-violet-600 text-white font-medium text-sm hover:from-indigo-500 hover:to-violet-500 transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/25 hover:-translate-y-0.5"
+                        href="#projects"
+                        className="group inline-flex items-center gap-2.5 px-6 py-3 rounded-full bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600 text-white font-medium text-sm hover:shadow-xl hover:shadow-orange-500/15 hover:-translate-y-0.5 transition-all duration-300"
                     >
-                        <Mail size={16} />
-                        Get in Touch
+                        <FolderGit2 size={16} />
+                        View Projects
                     </a>
                     <a
-                        href="https://github.com/ayushjava07"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="group inline-flex items-center gap-2.5 px-7 py-3 rounded-full border border-zinc-300 dark:border-zinc-700/80 bg-white dark:bg-transparent text-zinc-700 dark:text-zinc-300 font-medium text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
+                        href="#contact"
+                        className="group inline-flex items-center gap-2.5 px-6 py-3 rounded-full border border-zinc-300/80 dark:border-zinc-700/80 bg-white/70 dark:bg-transparent text-zinc-800 dark:text-zinc-200 font-medium text-sm hover:bg-zinc-50 dark:hover:bg-zinc-800/50 hover:border-zinc-400 dark:hover:border-zinc-600 hover:text-zinc-900 dark:hover:text-white transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg"
                     >
-                        <Github size={16} />
-                        View GitHub
+                        <Mail size={16} />
+                        Contact
                     </a>
                 </motion.div>
 
@@ -283,12 +326,12 @@ const HeroSection = () => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ duration: 0.6, delay: 0.7 }}
-                    className="flex items-center justify-center gap-2"
+                    className="lg:col-span-7 flex items-center justify-start gap-1.5"
                 >
                     {[
-                        { icon: <Github size={17} />, href: 'https://github.com/ayushjava07', label: 'GitHub' },
-                        { icon: <Linkedin size={17} />, href: 'https://www.linkedin.com/in/ayush-kumar-jha-09257b2b2/', label: 'LinkedIn' },
-                        { icon: <Twitter size={17} />, href: 'https://x.com/Ayushdev_01', label: 'X (Twitter)' },
+                        { icon: <Github size={17} />, href: SITE.links.github, label: 'GitHub' },
+                        { icon: <Linkedin size={17} />, href: SITE.links.linkedin, label: 'LinkedIn' },
+                        { icon: <Twitter size={17} />, href: SITE.links.x, label: 'X (Twitter)' },
                     ].map((s) => (
                         <a
                             key={s.label}
@@ -302,6 +345,53 @@ const HeroSection = () => {
                         </a>
                     ))}
                 </motion.div>
+
+                {/* Terminal vibe card */}
+                <motion.div
+                    variants={scaleIn}
+                    initial="hidden"
+                    animate="visible"
+                    className="lg:col-span-5 relative rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/70 dark:bg-zinc-900/35 backdrop-blur-xl p-5 sm:p-6 overflow-hidden shadow-xl shadow-zinc-200/40 dark:shadow-black/30"
+                >
+                    <div className="absolute -inset-16 bg-gradient-to-br from-orange-500/15 via-fuchsia-500/10 to-violet-500/15 blur-3xl pointer-events-none" />
+                    <div className="relative">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center gap-2 text-xs font-mono text-zinc-500">
+                                <Terminal size={14} className="text-orange-400" />
+                                <span>status</span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2.5 h-2.5 rounded-full bg-rose-400/80" />
+                                <span className="w-2.5 h-2.5 rounded-full bg-amber-400/80" />
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/80" />
+                            </div>
+                        </div>
+                        <div className="rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/60 dark:bg-black/25 p-4 font-mono text-[12px] leading-relaxed text-zinc-700 dark:text-zinc-300">
+                            <div className="text-zinc-500">$ whoami</div>
+                            <div className="mt-1">{SITE.name}</div>
+                            <div className="mt-3 text-zinc-500">$ focus</div>
+                            <div className="mt-1">ui-engineering • performance • web3</div>
+                            <div className="mt-3 text-zinc-500">$ impact</div>
+                            <div className="mt-1 grid grid-cols-2 gap-2">
+                                {IMPACT.slice(0, 4).map((s) => (
+                                    <div key={s.label} className="rounded-lg border border-zinc-200/50 dark:border-zinc-800/60 bg-white/50 dark:bg-zinc-900/30 px-3 py-2">
+                                        <div className="text-[10px] text-zinc-500">{s.label}</div>
+                                        <div className="text-sm font-semibold text-zinc-900 dark:text-white">{s.value}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="mt-4 flex items-center gap-3 text-xs text-zinc-500">
+                            <span className="inline-flex items-center gap-1.5">
+                                <MapPin size={12} className="text-violet-400" /> {SITE.location}
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                                <Mail size={12} className="text-orange-400" /> {SITE.email}
+                            </span>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
             </div>
 
             {/* Scroll indicator */}
@@ -324,55 +414,95 @@ const HeroSection = () => {
 };
 
 /* ═══════════════════════════════════════════════
+   ABOUT / JOURNEY SECTION — concise storytelling
+   ═══════════════════════════════════════════════ */
+const AboutSection = () => (
+    <Section id="about" className="py-12 md:py-16">
+        <div className="max-w-6xl mx-auto px-6">
+            <motion.div variants={fadeUp} className="mb-8">
+                <span className="inline-flex items-center gap-2 text-sm font-mono text-orange-400 mb-3">
+                    <Terminal size={14} />
+                    ABOUT
+                </span>
+                <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
+                    My <span className="text-gradient">journey</span> (in short)
+                </h2>
+                <p className="mt-3 text-zinc-600 dark:text-zinc-400 max-w-xl text-sm">
+                    I ship clean UI and measurable outcomes.
+                </p>
+            </motion.div>
+
+            <div className="grid lg:grid-cols-12 gap-6 md:gap-4 items-start">
+                <motion.div variants={fadeUp} className="lg:col-span-7">
+                    <div className="space-y-3">
+                        {JOURNEY.map((step, i) => (
+                            <div
+                                key={step.title}
+                                className="group relative rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-all duration-500 overflow-hidden"
+                            >
+                                <div className="absolute -inset-10 bg-gradient-to-br from-orange-500/10 via-fuchsia-500/6 to-violet-500/10 opacity-0 group-hover:opacity-100 blur-3xl transition-opacity duration-500 pointer-events-none" />
+                                <div className="relative flex items-start gap-4">
+                                    <div className="mt-1 w-10 h-10 rounded-xl bg-gradient-to-br from-orange-500 to-violet-600 text-white flex items-center justify-center font-bold text-sm shadow-lg shrink-0">
+                                        {String(i + 1).padStart(2, '0')}
+                                    </div>
+                                    <div>
+                                        <div className="flex items-center gap-3 flex-wrap">
+                                            <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">{step.title}</h3>
+                                            <span className="text-xs font-mono text-zinc-500">{step.period}</span>
+                                        </div>
+                                        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed">
+                                            {step.description}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </motion.div>
+
+                <motion.div variants={fadeUp} className="lg:col-span-5">
+                    <div className="rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/35 backdrop-blur-xl p-6 overflow-hidden">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider">
+                                What you can expect
+                            </h3>
+                            <span className="text-xs font-mono text-orange-400">v2026</span>
+                        </div>
+                        <ul className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+                            {[
+                                "Premium spacing + typography (8px grid, crisp hierarchy).",
+                                "Micro-interactions that feel fast — never heavy.",
+                                "Story-first projects: problem → solution → impact.",
+                                "Performance-minded UI (lazy assets, tight components).",
+                            ].map((x) => (
+                                <li key={x} className="flex items-start gap-2">
+                                    <ChevronRight size={16} className="text-violet-400 mt-0.5 shrink-0" />
+                                    <span>{x}</span>
+                                </li>
+                            ))}
+                        </ul>
+
+                        <div className="mt-6 grid grid-cols-2 gap-3">
+                            {IMPACT.map((s) => (
+                                <div
+                                    key={s.label}
+                                    className="rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/40 dark:bg-black/20 p-4 hover:bg-zinc-100/60 dark:hover:bg-black/30 transition-colors"
+                                >
+                                    <div className="text-xl font-bold text-zinc-900 dark:text-white">{s.value}</div>
+                                    <div className="mt-1 text-xs text-zinc-500">{s.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </div>
+    </Section>
+);
+
+/* ═══════════════════════════════════════════════
    EXPERIENCE SECTION
    ═══════════════════════════════════════════════ */
-const EXPERIENCES = [
-    {
-        company: 'DCC (Developer & Coding Club)',
-        role: 'Core Web Developer',
-        period: 'Oct 2025 – Present',
-        type: 'On-Campus',
-        logo: 'DC',
-        gradient: 'from-indigo-500 to-blue-500',
-        bullets: [
-            'Core contributor to the club\'s official website and internal tools.',
-            'Designed and implemented reusable, responsive UI components.',
-            'Collaborated with team members to ship features efficiently.',
-            'Optimized frontend performance and code maintainability.',
-        ],
-        tech: ['React.js', 'Tailwind CSS', 'Node.js', 'Express.js', 'Git', 'Vercel'],
-    },
-    {
-        company: 'Graphixio',
-        role: 'Freelance Web Developer',
-        period: 'Apr 2025 – Present',
-        type: 'Remote',
-        logo: 'GX',
-        gradient: 'from-violet-500 to-purple-500',
-        bullets: [
-            'Delivered animated landing pages and interactive product showcases.',
-            'Built smooth UI animations focused on user engagement.',
-            'Converted Figma designs into pixel-perfect responsive layouts.',
-            'Worked directly with clients and iterated based on feedback.',
-        ],
-        tech: ['HTML', 'CSS', 'JavaScript', 'GSAP', 'Spline', 'Figma'],
-    },
-    {
-        company: 'SSOC\'24 (Social Summer of Code)',
-        role: 'Open Source Contributor',
-        period: 'May 2025 – Present',
-        type: 'Remote',
-        logo: 'OS',
-        gradient: 'from-emerald-500 to-teal-500',
-        bullets: [
-            'Contributed to multiple open-source projects with merged PRs.',
-            'Fixed bugs, added features, and improved documentation.',
-            'Followed standard GitHub workflows and best practices.',
-        ],
-        tech: ['JavaScript', 'Markdown', 'GitHub'],
-    },
-];
-
 const ExperienceCard = ({ exp, index }) => {
     const [open, setOpen] = useState(index === 0);
 
@@ -475,7 +605,7 @@ const ExperienceSection = () => (
                     EXPERIENCE
                 </span>
                 <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
-                    Where I've <span className="text-gradient">Contributed</span>
+                    Where I've <span className="text-gradient">made impact</span>
                 </h2>
             </motion.div>
 
@@ -491,56 +621,8 @@ const ExperienceSection = () => (
 /* ═══════════════════════════════════════════════
    PROJECTS SECTION
    ═══════════════════════════════════════════════ */
-const PROJECTS = [
-    {
-        title: 'DripX V2',
-        subtitle: 'Solana Wallet Interaction DApp',
-        description:
-            'Full-featured Solana DApp with wallet connection, Devnet airdrops, balance checking, message signing, and on-chain transaction execution.',
-        tech: ['React.js', 'Tailwind CSS', '@solana/web3.js', 'Wallet Adapter', 'Phantom'],
-        gradient: 'from-indigo-500 via-violet-500 to-purple-500',
-        icon: '◈',
-    },
-    {
-        title: 'Wallify.io',
-        subtitle: 'Solana Wallet Generator',
-        description:
-            'Browser-based wallet generator that creates Solana keypairs and mnemonic seed phrases securely — all client-side.',
-        tech: ['React.js', 'Node.js', '@solana/web3.js', 'bs58', 'tweetnacl'],
-        gradient: 'from-cyan-500 via-blue-500 to-indigo-500',
-        icon: '⬡',
-    },
-    {
-        title: 'Event Covering Website',
-        subtitle: 'Interactive Event Landing Page',
-        description:
-            'Responsive event page featuring countdown timers, smooth scroll-driven animations, and an interactive, engagement-focused UI.',
-        tech: ['HTML', 'CSS', 'JavaScript', 'GSAP', 'Locomotive.js'],
-        gradient: 'from-amber-500 via-orange-500 to-red-500',
-        icon: '◇',
-    },
-    {
-        title: 'Fanta Brand Ad Page',
-        subtitle: 'Animated Product Advertisement',
-        description:
-            'Engaging 2D animated product advertisement page with dynamic visuals and smooth interaction-driven animations.',
-        tech: ['HTML', 'CSS', 'JavaScript', 'GSAP'],
-        gradient: 'from-green-500 via-emerald-500 to-teal-500',
-        icon: '△',
-    },
-    {
-        title: 'Aayam 2026',
-        subtitle: 'Techno-Management Fest Website',
-        description:
-            'The official website for Aayam 2026. Built with a focus on modern UI/UX, responsiveness, and smooth animations.',
-        tech: ['React.js', 'Tailwind CSS', 'Framer Motion'],
-        gradient: 'from-pink-500 via-rose-500 to-red-500',
-        icon: '★',
-        link: 'https://aayam.nitagymkhana.com/',
-    },
-];
-
 const ProjectCard = ({ project, index }) => {
+    const Icon = project.icon ? project.icon : null;
     const CardContent = () => (
         <div className="relative h-full rounded-2xl border border-zinc-200 dark:border-zinc-800/50 bg-white dark:bg-zinc-900/30 hover:bg-zinc-50/50 dark:hover:bg-zinc-900/60 hover:border-zinc-300 dark:hover:border-zinc-700/60 transition-all duration-500 overflow-hidden hover:shadow-lg hover:shadow-zinc-200/50 dark:hover:shadow-black/20">
             {/* Top gradient shimmer */}
@@ -553,24 +635,37 @@ const ProjectCard = ({ project, index }) => {
                 {/* Header */}
                 <div className="flex justify-between items-start mb-4">
                     <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${project.gradient} flex items-center justify-center text-white text-lg shadow-lg`}>
-                        {project.icon}
+                        {Icon ? <Icon size={18} /> : <Code2 size={18} />}
                     </div>
                     <ExternalLink
                         size={18}
-                        className="text-zinc-600 group-hover:text-gold-400 transition-colors duration-300"
+                        className="text-zinc-600 group-hover:text-orange-400 transition-colors duration-300"
                     />
                 </div>
 
                 {/* Title */}
-                <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-2 group-hover:text-gradient transition-all duration-300">
+                <h3 className="text-xl font-bold text-zinc-900 dark:text-white mb-2 group-hover:text-gradient transition-all duration-300">
                     {project.title}
                 </h3>
-                <p className="text-indigo-400/80 text-base font-medium mb-3">{project.subtitle}</p>
+                <p className="text-violet-500/90 dark:text-violet-400/90 text-sm font-medium mb-3">{project.subtitle}</p>
 
                 {/* Description */}
-                <p className="text-zinc-500 dark:text-zinc-400 text-base leading-relaxed mb-6 flex-grow">
-                    {project.description}
-                </p>
+                <div className="text-zinc-600 dark:text-zinc-400 text-xs leading-relaxed mb-6 flex-grow space-y-2">
+                    <p>
+                        <span className="text-zinc-500 dark:text-zinc-500 font-mono text-[10px] uppercase tracking-wider">Problem</span>
+                        <span className="block mt-1">{project.problem}</span>
+                    </p>
+                    <p>
+                        <span className="text-zinc-500 dark:text-zinc-500 font-mono text-[10px] uppercase tracking-wider">Solution</span>
+                        <span className="block mt-1">{project.solution}</span>
+                    </p>
+                    {project.impact && (
+                        <p className="text-xs text-zinc-500">
+                            <span className="font-mono text-[10px] uppercase tracking-wider text-orange-400">Impact</span>
+                            <span className="block mt-1">{project.impact}</span>
+                        </p>
+                    )}
+                </div>
 
                 {/* Tech tags */}
                 <div className="flex flex-wrap gap-2 mt-auto">
@@ -583,14 +678,38 @@ const ProjectCard = ({ project, index }) => {
                         </span>
                     ))}
                 </div>
+
+                <div className="mt-5 flex flex-wrap items-center gap-3">
+                    {project.links?.live && (
+                        <a
+                            href={project.links.live}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-orange-400 transition-colors"
+                        >
+                            Live <ArrowUpRight size={13} />
+                        </a>
+                    )}
+                    {project.links?.github && (
+                        <a
+                            href={project.links.github}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-orange-400 transition-colors"
+                        >
+                            GitHub <ArrowUpRight size={13} />
+                        </a>
+                    )}
+                </div>
             </div>
         </div>
     );
 
-    if (project.link) {
+    const href = project.links?.live || project.link;
+    if (href) {
         return (
             <motion.a
-                href={project.link}
+                href={href}
                 target="_blank"
                 rel="noopener noreferrer"
                 variants={fadeUp}
@@ -619,11 +738,14 @@ const ProjectsSection = () => (
             <motion.div variants={fadeUp} className="mb-8">
                 <span className="inline-flex items-center gap-2 text-sm font-mono text-indigo-400 mb-3">
                     <FolderGit2 size={14} />
-                    FEATURED PROJECTS
+                    PROJECTS
                 </span>
                 <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
-                    Things I've <span className="text-gradient">Built</span>
+                    Things I've <span className="text-gradient">shipped</span>
                 </h2>
+                <p className="mt-3 text-zinc-600 dark:text-zinc-400 max-w-xl text-sm">
+                    Short, focused, production-minded builds.
+                </p>
             </motion.div>
 
             <div className="grid md:grid-cols-2 gap-6 md:gap-4">
@@ -648,10 +770,10 @@ const ProjectsSection = () => (
 );
 
 /* ═══════════════════════════════════════════════
-   GITHUB SECTION — REAL DATA
+   PROOF OF WORK + GITHUB — enhanced UI
    ═══════════════════════════════════════════════ */
 
-const GITHUB_USERNAME = 'ayushjava07';
+const GITHUB_USERNAME = SITE.github;
 
 const useGitHubData = () => {
     const [profile, setProfile] = useState(null);
@@ -740,7 +862,7 @@ const langColors = {
 
 /* ── Interactive Contribution Calendar — REAL DATA ── */
 
-const ContributionCalendar = ({ username }) => {
+const ContributionCalendar = ({ username, onTotalChange }) => {
     const [hoveredCell, setHoveredCell] = useState(null);
     const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
     const [contributionData, setContributionData] = useState([]);
@@ -764,6 +886,7 @@ const ContributionCalendar = ({ username }) => {
                 // For "last year", let's approximate by summing the counts in the response.
                 const total = data.contributions.reduce((acc, day) => acc + day.count, 0);
                 setTotalContributions(total);
+                onTotalChange?.(total);
 
                 // Transform flat array into weeks (Sunday to Saturday)
                 // The API returns a flat list of days. We need to group them.
@@ -1025,8 +1148,99 @@ const ContributionCalendar = ({ username }) => {
     );
 };
 
-const GitHubSection = () => {
-    const { profile, events, repos, loading } = useGitHubData();
+const ProofSection = ({ profile, loading }) => {
+    const [totalContributions, setTotalContributions] = useState(null);
+    const stats = [
+        { label: 'Contributions (last year)', value: totalContributions ? totalContributions.toLocaleString() : '—' },
+        { label: 'Public repos', value: loading ? '—' : profile?.public_repos ?? '—' },
+        { label: 'Open-source PRs merged', value: '4+' },
+        { label: 'Websites led', value: '5+' },
+    ];
+
+    return (
+        <Section id="proof" className="py-12 md:py-16">
+            <div className="max-w-6xl mx-auto px-6">
+                <motion.div variants={fadeUp} className="mb-8">
+                    <span className="inline-flex items-center gap-2 text-sm font-mono text-orange-400 mb-3">
+                        <GitCommit size={14} />
+                        PROOF OF WORK
+                    </span>
+                    <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
+                        Signals that <span className="text-gradient">I ship</span>
+                    </h2>
+                    <p className="mt-3 text-zinc-600 dark:text-zinc-400 max-w-xl text-sm">
+                        Public signals. Real outcomes.
+                    </p>
+                </motion.div>
+
+                <motion.div variants={fadeUp} className="grid md:grid-cols-12 gap-6 md:gap-4">
+                    <div className="md:col-span-7 rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6 overflow-hidden">
+                        <div className="flex items-center justify-between mb-5">
+                            <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2">
+                                <GitCommit size={14} className="text-orange-400" />
+                                Contribution Graph
+                            </h3>
+                            <a
+                                href={`https://github.com/${GITHUB_USERNAME}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs text-orange-400 hover:text-orange-300 transition-colors font-mono"
+                            >
+                                <Github size={12} />
+                                @{GITHUB_USERNAME}
+                                <ArrowUpRight size={10} />
+                            </a>
+                        </div>
+                        <ContributionCalendar username={GITHUB_USERNAME} onTotalChange={setTotalContributions} />
+                    </div>
+
+                    <div className="md:col-span-5 space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
+                            {stats.map((s) => (
+                                <div
+                                    key={s.label}
+                                    className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-white/60 dark:bg-zinc-900/30 backdrop-blur-xl p-4 hover:bg-zinc-50 dark:hover:bg-zinc-900/45 transition-colors"
+                                >
+                                    <div className="text-xl font-bold text-zinc-900 dark:text-white">{s.value}</div>
+                                    <div className="mt-1 text-xs text-zinc-500">{s.label}</div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-white/60 dark:bg-zinc-900/30 backdrop-blur-xl p-5">
+                            <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-3">
+                                Tech I use in production
+                            </h3>
+                            <div className="flex flex-wrap gap-2">
+                                {[
+                                    'React',
+                                    'TypeScript',
+                                    'Tailwind',
+                                    'Node.js',
+                                    'CI/CD',
+                                    'GitHub Actions',
+                                    'Solana',
+                                ].map((t) => (
+                                    <span
+                                        key={t}
+                                        className="px-2.5 py-1 rounded-md text-[11px] font-mono bg-zinc-100/70 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 border border-zinc-200/60 dark:border-zinc-800/60"
+                                    >
+                                        {t}
+                                    </span>
+                                ))}
+                            </div>
+                            <p className="mt-3 text-xs text-zinc-500">
+                                Strong bias for fast UI, readable code, and deployment reliability.
+                            </p>
+                        </div>
+                    </div>
+                </motion.div>
+            </div>
+        </Section>
+    );
+};
+
+const GitHubSection = ({ profile, events, repos, loading }) => {
 
     // Deduplicate events for display (max 8)
     const recentEvents = events.slice(0, 8);
@@ -1042,56 +1256,6 @@ const GitHubSection = () => {
                     <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
                         GitHub <span className="text-gradient">Activity</span>
                     </h2>
-                </motion.div>
-
-                {/* Stats Row — real data */}
-                <motion.div
-                    variants={fadeUp}
-                    className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8"
-                >
-                    {[
-                        { icon: <Code2 size={16} />, label: 'Public Repos', value: loading ? '—' : profile?.public_repos },
-                        { icon: <Star size={16} />, label: 'Followers', value: loading ? '—' : profile?.followers },
-                        { icon: <GitBranch size={16} />, label: 'Following', value: loading ? '—' : profile?.following },
-                        { icon: <GitCommit size={16} />, label: 'Recent Events', value: loading ? '—' : events.length + '+' },
-                    ].map((stat) => (
-                        <div
-                            key={stat.label}
-                            className="flex items-center gap-3 p-4 rounded-xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 hover:bg-zinc-100/50 dark:hover:bg-zinc-900/50 transition-colors"
-                        >
-                            <div className="p-2 rounded-lg bg-zinc-100/50 dark:bg-zinc-800/50 text-indigo-400">
-                                {stat.icon}
-                            </div>
-                            <div>
-                                <p className="text-xl font-bold text-zinc-900 dark:text-white">{stat.value}</p>
-                                <p className="text-xs text-zinc-500">{stat.label}</p>
-                            </div>
-                        </div>
-                    ))}
-                </motion.div>
-
-                {/* Contribution Graph — Custom Interactive Calendar */}
-                <motion.div
-                    variants={fadeUp}
-                    className="rounded-2xl border border-zinc-200/50 dark:border-zinc-800/50 bg-zinc-50/30 dark:bg-zinc-900/30 p-5 sm:p-6 mb-6 overflow-hidden"
-                >
-                    <div className="flex items-center justify-between mb-5">
-                        <h3 className="text-sm font-semibold text-zinc-500 dark:text-zinc-400 uppercase tracking-wider flex items-center gap-2">
-                            <GitCommit size={14} className="text-indigo-400" />
-                            Contribution Graph
-                        </h3>
-                        <a
-                            href={`https://github.com/${GITHUB_USERNAME}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1.5 text-xs text-indigo-400 hover:text-indigo-300 transition-colors font-mono"
-                        >
-                            <Github size={12} />
-                            @{GITHUB_USERNAME}
-                            <ArrowUpRight size={10} />
-                        </a>
-                    </div>
-                    <ContributionCalendar username={GITHUB_USERNAME} />
                 </motion.div>
 
                 {/* Two-column: Recent Activity + Recent Repos */}
@@ -1273,8 +1437,8 @@ const TechStackSection = () => (
                 <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
                     Tools & <span className="text-gradient">Technologies</span>
                 </h2>
-                <p className="mt-4 text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto text-base sm:text-lg">
-                    The development suite I use to build robust, scalable, and interactive applications.
+                <p className="mt-3 text-zinc-500 dark:text-zinc-400 max-w-xl mx-auto text-sm">
+                    My daily stack.
                 </p>
             </motion.div>
 
@@ -1329,6 +1493,132 @@ const TechStackSection = () => (
 );
 
 /* ═══════════════════════════════════════════════
+   CONTACT SECTION — minimal, premium
+   ═══════════════════════════════════════════════ */
+const ContactSection = () => (
+    <Section id="contact" className="py-12 md:py-16">
+        <div className="max-w-6xl mx-auto px-6">
+            <motion.div variants={fadeUp} className="mb-8">
+                <span className="inline-flex items-center gap-2 text-sm font-mono text-orange-400 mb-3">
+                    <Mail size={14} />
+                    CONTACT
+                </span>
+                <h2 className="text-4xl sm:text-5xl font-bold text-zinc-900 dark:text-white">
+                    Let's <span className="text-gradient">build</span> something
+                </h2>
+                <p className="mt-3 text-zinc-600 dark:text-zinc-400 max-w-xl text-sm">
+                    Recruiter, maintainer, or founder — send details.
+                </p>
+            </motion.div>
+
+            <motion.div variants={fadeUp} className="grid lg:grid-cols-12 gap-6 md:gap-4">
+                <div className="lg:col-span-7 rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/30 backdrop-blur-xl p-6">
+                    <form
+                        className="space-y-4"
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            const form = e.currentTarget;
+                            const data = new FormData(form);
+                            const name = String(data.get('name') || '').trim();
+                            const from = String(data.get('email') || '').trim();
+                            const message = String(data.get('message') || '').trim();
+                            const subject = encodeURIComponent(`Portfolio inquiry${name ? ` — ${name}` : ''}`);
+                            const body = encodeURIComponent(
+                                `Hi Ayush,\n\n${message}\n\n— ${name || 'Anonymous'}${from ? `\n${from}` : ''}`
+                            );
+                            window.location.href = `mailto:${SITE.email}?subject=${subject}&body=${body}`;
+                        }}
+                    >
+                        <div className="grid sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-xs font-mono text-zinc-500 mb-2">Name</label>
+                                <input
+                                    name="name"
+                                    className="w-full rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-black/20 px-4 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50"
+                                    placeholder="Your name"
+                                    autoComplete="name"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-mono text-zinc-500 mb-2">Email</label>
+                                <input
+                                    name="email"
+                                    type="email"
+                                    className="w-full rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-black/20 px-4 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50"
+                                    placeholder="you@company.com"
+                                    autoComplete="email"
+                                />
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className="block text-xs font-mono text-zinc-500 mb-2">Message</label>
+                            <textarea
+                                name="message"
+                                required
+                                className="w-full min-h-[140px] rounded-xl border border-zinc-200/70 dark:border-zinc-800/70 bg-white/70 dark:bg-black/20 px-4 py-3 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-orange-400/50 resize-none"
+                                placeholder="What are we building, timeline, and links?"
+                            />
+                        </div>
+
+                        <button
+                            type="submit"
+                            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-orange-500 via-fuchsia-500 to-violet-600 text-white text-sm font-medium hover:shadow-xl hover:shadow-orange-500/15 transition-all duration-300"
+                        >
+                            Send email <ArrowUpRight size={16} />
+                        </button>
+                    </form>
+                </div>
+
+                <div className="lg:col-span-5 space-y-4">
+                    <div className="rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-zinc-50/30 dark:bg-zinc-900/30 p-6">
+                        <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-4">
+                            Social
+                        </h3>
+                        <div className="flex flex-wrap gap-2">
+                            {[
+                                { icon: <Github size={16} />, label: 'GitHub', href: SITE.links.github },
+                                { icon: <Linkedin size={16} />, label: 'LinkedIn', href: SITE.links.linkedin },
+                                { icon: <Twitter size={16} />, label: 'X', href: SITE.links.x },
+                                { icon: <Mail size={16} />, label: 'Email', href: `mailto:${SITE.email}` },
+                            ].map((s) => (
+                                <a
+                                    key={s.label}
+                                    href={s.href}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/50 dark:bg-black/15 text-sm text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50 dark:hover:bg-black/25 transition-all duration-300"
+                                >
+                                    <span className="text-orange-400">{s.icon}</span>
+                                    {s.label}
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border border-zinc-200/60 dark:border-zinc-800/60 bg-white/60 dark:bg-zinc-900/30 backdrop-blur-xl p-6">
+                        <h3 className="text-sm font-semibold text-zinc-600 dark:text-zinc-300 uppercase tracking-wider mb-3">
+                            Quick details
+                        </h3>
+                        <div className="space-y-3 text-sm text-zinc-600 dark:text-zinc-400">
+                            <div className="flex items-center gap-2">
+                                <MapPin size={16} className="text-violet-400" /> {SITE.location}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Mail size={16} className="text-orange-400" /> {SITE.email}
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <GitBranch size={16} className="text-fuchsia-400" /> github.com/{SITE.github}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
+        </div>
+    </Section>
+);
+
+/* ═══════════════════════════════════════════════
    FOOTER
    ═══════════════════════════════════════════════ */
 const Footer = () => (
@@ -1338,11 +1628,11 @@ const Footer = () => (
                 {/* Left */}
                 <div className="text-center md:text-left">
                     <div className="flex items-center gap-2 justify-center md:justify-start mb-2">
-                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold text-[10px]">
-                            A
+                        <div className="w-6 h-6 rounded-md bg-gradient-to-br from-orange-500 to-violet-500 flex items-center justify-center text-white font-bold text-[10px]">
+                            {SITE.name.split(' ')[0]?.[0] || 'A'}
                         </div>
                         <span className="text-sm font-semibold text-zinc-900 dark:text-white">
-                            Ayush Kumar Jha
+                            {SITE.name}
                         </span>
                     </div>
                     <p className="text-xs text-zinc-600">
@@ -1352,7 +1642,7 @@ const Footer = () => (
 
                 {/* Center Links */}
                 <div className="flex items-center gap-6 text-sm text-zinc-500">
-                    {NAV_LINKS.map((l) => (
+                    {NAV_LINKS.filter((l) => l.id !== 'home').map((l) => (
                         <a key={l.label} href={l.href} className="hover:text-zinc-900 dark:hover:text-zinc-300 transition-colors">
                             {l.label}
                         </a>
@@ -1362,10 +1652,10 @@ const Footer = () => (
                 {/* Right Social */}
                 <div className="flex items-center gap-2">
                     {[
-                        { icon: <Github size={16} />, href: 'https://github.com/ayushjava07' },
-                        { icon: <Linkedin size={16} />, href: 'https://www.linkedin.com/in/ayush-kumar-jha-09257b2b2/' },
-                        { icon: <Twitter size={16} />, href: 'https://x.com/Ayushdev_01' },
-                        { icon: <Mail size={16} />, href: 'mailto:ayushjhasahab07@gmail.com' },
+                        { icon: <Github size={16} />, href: SITE.links.github },
+                        { icon: <Linkedin size={16} />, href: SITE.links.linkedin },
+                        { icon: <Twitter size={16} />, href: SITE.links.x },
+                        { icon: <Mail size={16} />, href: `mailto:${SITE.email}` },
                     ].map((s, i) => (
                         <a
                             key={i}
@@ -1382,7 +1672,7 @@ const Footer = () => (
 
             <div className="mt-8 pt-6 border-t border-zinc-200/30 dark:border-zinc-800/30 text-center">
                 <p className="text-xs text-zinc-700">
-                    © {new Date().getFullYear()} Ayush Kumar Jha. All rights reserved.
+                    © {new Date().getFullYear()} {SITE.name}. All rights reserved.
                 </p>
             </div>
         </div>
@@ -1393,14 +1683,18 @@ const Footer = () => (
    MAIN PORTFOLIO COMPONENT
    ═══════════════════════════════════════════════ */
 const Portfolio = () => {
+    const { profile, events, repos, loading } = useGitHubData();
     return (
         <div className="relative min-h-screen bg-white dark:bg-[#09090b] text-zinc-900 dark:text-white noise">
             <Navbar />
             <HeroSection />
-            <ExperienceSection />
+            <AboutSection />
             <ProjectsSection />
-            <GitHubSection />
+            <ProofSection profile={profile} loading={loading} />
+            <ExperienceSection />
+            <GitHubSection profile={profile} events={events} repos={repos} loading={loading} />
             <TechStackSection />
+            <ContactSection />
             <Footer />
         </div>
     );

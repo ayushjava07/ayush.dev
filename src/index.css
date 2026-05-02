@@ -12,11 +12,11 @@
   --color-text-primary: #fafafa;
   --color-text-secondary: #a1a1aa;
   --color-text-muted: #71717a;
-  --color-accent: #818cf8;
-  --color-accent-glow: rgba(129, 140, 248, 0.15);
-  --color-accent-secondary: #a78bfa;
-  --color-gradient-start: #6366f1;
-  --color-gradient-end: #a78bfa;
+  --color-accent: #fb923c; /* orange */
+  --color-accent-glow: rgba(251, 146, 60, 0.16);
+  --color-accent-secondary: #a78bfa; /* purple */
+  --color-gradient-start: #fb923c; /* orange */
+  --color-gradient-end: #a78bfa; /* purple */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
@@ -31,11 +31,11 @@
   --color-text-primary: #18181b;
   --color-text-secondary: #52525b;
   --color-text-muted: #a1a1aa;
-  --color-accent: #6366f1;
-  --color-accent-glow: rgba(99, 102, 241, 0.15);
-  --color-accent-secondary: #818cf8;
-  --color-gradient-start: #6366f1;
-  --color-gradient-end: #8b5cf6;
+  --color-accent: #ea580c;
+  --color-accent-glow: rgba(234, 88, 12, 0.14);
+  --color-accent-secondary: #7c3aed;
+  --color-gradient-start: #ea580c;
+  --color-gradient-end: #7c3aed;
 }
 
 @layer base {
@@ -48,6 +48,11 @@
   html {
     scroll-behavior: smooth;
     font-size: 16px;
+  }
+
+  /* Fixed header offset for anchor navigation */
+  section {
+    scroll-margin-top: 88px;
   }
 
   body {
@@ -272,11 +277,11 @@
 }
 
 .glow-accent {
-  box-shadow: 0 0 40px -10px rgba(129, 140, 248, 0.3);
+  box-shadow: 0 0 44px -12px var(--color-accent-glow);
 }
 
 .glow-accent-subtle {
-  box-shadow: 0 0 20px -5px rgba(129, 140, 248, 0.15);
+  box-shadow: 0 0 22px -10px var(--color-accent-glow);
 }
 
 /* ========== NOISE OVERLAY ========== */
